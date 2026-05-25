@@ -448,13 +448,17 @@ OUTPUT the following HTML exactly, filling in real data. Do NOT change any inlin
 
 def generate_html_with_claude(prompt: str) -> str:
     client = _claude_client()
-    msg = client.messages.create(
+    html_chunks = []
+    with client.messages.stream(
         model="claude-sonnet-4-6",
         max_tokens=24000,
         messages=[{"role": "user", "content": prompt}],
-    )
-    log.info("Claude stop_reason=%s tokens_used=%s", msg.stop_reason, msg.usage.output_tokens)
-    html = msg.content[0].text.strip()
+    ) as stream:
+        for text in stream.text_stream:
+            html_chunks.append(text)
+        final = stream.get_final_message()
+        log.info("Claude stop_reason=%s tokens_used=%s", final.stop_reason, final.usage.output_tokens)
+    html = "".join(html_chunks).strip()
     # Strip markdown code fences if Claude wrapped the output
     if html.startswith("```"):
         html = html.split("\n", 1)[1] if "\n" in html else html
