@@ -210,7 +210,9 @@ def build_card_data_text(cards: list[dict]) -> str:
 
 
 RAVI_PROMPT_TEMPLATE = """
-You are an email formatter. Generate a polished HTML email body for Ravi's pre-meeting digest.
+You are an HTML email generator. Output a COMPLETE, self-contained HTML email for Ravi's pre-meeting digest.
+Output ONLY raw HTML — no markdown, no code fences, no explanation.
+CRITICAL: Use ONLY inline styles with hardcoded hex colors — NO CSS classes, NO <style> blocks, NO CSS variables. Every element must have style= attributes directly.
 
 MEETING DATE: {meeting_date}
 TODAY: {today}
@@ -218,39 +220,229 @@ TODAY: {today}
 CARD DATA:
 {card_data}
 
-RULES:
-1. HTML only — no markdown, no code fences.
-2. Sections in order: RED (1), AMBER (2), ORANGE (3), GREEN (4).
-3. Each section has a coloured header and a table: Card | List | Due Date | Checklist Progress.
-4. Due date styling: OVERDUE = bold red + "[OVERDUE]", TODAY = bold red + "[TODAY]", DUE SOON = orange, normal = plain.
-5. Checklist cell: show done/total (pct%). If pending>0: show "N pending" in red. If 0% and total>0: "⚠ Not started" red. If 100%: "✓ Complete" green. If no checklist: "No checklist" grey italic.
-6. Add an action box (amber border, light yellow bg) at the bottom listing: cards with 0% due within 7 days, overdue cards, cards due within 2 days.
-7. Start with: "Hi Ravi,<br><br>There's a Ravi (Trello) meeting on {meeting_date}. Please update checklist progress and add comments on overdue cards before the meeting."
-8. Footer: "Valuecart Automation · ravi.digest@valuecart.in · Sent 2 days before meeting"
-9. Output ONLY the HTML body (starting from <div or <table — no <html><head><body> wrapper).
+COLOR REFERENCE (use these exact hex values inline):
+- Navy bg: #1C2A3A  Navy mid: #2C3E50  Page bg: #F0F2F5
+- Red: #B03A2E  Red light: #FBEAE9  Red bar: #C0392B
+- Amber: #9A7D0A  Amber light: #FEFDE7  Amber bar: #D4AC0D
+- Orange: #A04000  Orange light: #FEF5E7  Orange bar: #CA6F1E
+- Green: #1A5C35  Green light: #EAFAF1  Green bar: #1E8449
+- Grid: #D5D8DC  Text: #1C1C1C  Meta: #566573
+
+STRUCTURE:
+
+<html><body style="background:#F0F2F5;font-family:Arial,sans-serif;color:#1C1C1C;padding:32px 16px;">
+<div style="background:#FFFFFF;max-width:860px;margin:0 auto;padding:28px 30px;">
+
+  <!-- Navy header bar -->
+  <div style="background:#1C2A3A;color:white;padding:8px 14px;margin-bottom:4px;font-size:11px;">
+    <b>Ravi Shankar K</b> &nbsp;·&nbsp; <span style="opacity:0.7;">Sent 2 days before meeting · Subject: Ravi (Trello) — Pre-Meeting Digest | {meeting_date}</span>
+  </div>
+
+  <!-- Masthead -->
+  <div style="border-left:5px solid #1C2A3A;padding:2px 0 2px 14px;margin-bottom:6px;">
+    <div style="font-size:15px;font-weight:700;color:#1C2A3A;">Ravi Board — Pre-Meeting Prep</div>
+    <div style="font-size:10.5px;color:#566573;margin-top:3px;">Meeting: Ravi (Trello) &nbsp;·&nbsp; {today} &nbsp;·&nbsp; Please review your board and update all cards before the meeting</div>
+  </div>
+  <hr style="border:none;border-top:1px solid #D5D8DC;margin:10px 0 14px;">
+
+  <!-- Intro -->
+  <div style="font-size:11.5px;color:#566573;line-height:1.6;margin-bottom:14px;padding:10px 14px;background:#F8F9FA;border-left:3px solid #2C3E50;">
+    Hi <strong style="color:#1C2A3A;">Ravi</strong>,<br><br>
+    There's a <strong style="color:#1C2A3A;">Ravi (Trello)</strong> meeting on <strong style="color:#1C2A3A;">{meeting_date}</strong>. Please go through each item below, update checklist progress, and be ready with a status update. Items marked <strong style="color:#C0392B;">OVERDUE</strong> need immediate attention.
+  </div>
+
+  For each of the 4 sections, output a div block like this:
+  <!-- SECTION HEADER (use correct bg color per section) -->
+  <div style="margin-bottom:16px;">
+    <div style="padding:7px 12px;background:SECTION_COLOR;color:white;font-size:11px;font-weight:700;">SECTION_TITLE</div>
+    <div style="font-size:10px;color:#566573;padding:4px 12px 5px;background:#F8F9FA;border-bottom:1px solid #D5D8DC;font-style:italic;">SECTION_DESC</div>
+    <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
+      <thead><tr style="background:#2C3E50;">
+        <th style="color:white;font-size:10px;font-weight:600;text-transform:uppercase;padding:6px 8px;text-align:left;border:1px solid #1C2A3A;width:36%;">Card</th>
+        <th style="color:white;font-size:10px;font-weight:600;text-transform:uppercase;padding:6px 8px;text-align:left;border:1px solid #1C2A3A;width:16%;">List</th>
+        <th style="color:white;font-size:10px;font-weight:600;text-transform:uppercase;padding:6px 8px;text-align:left;border:1px solid #1C2A3A;width:18%;">Due Date</th>
+        <th style="color:white;font-size:10px;font-weight:600;text-transform:uppercase;padding:6px 8px;text-align:left;border:1px solid #1C2A3A;width:30%;">Checklist</th>
+      </tr></thead>
+      <tbody>
+        <!-- For each card, alternate row bg: odd=white, even=SECTION_LIGHT_COLOR -->
+        <tr style="background:ROW_BG;border-bottom:1px solid #D5D8DC;">
+          <td style="padding:7px 8px;vertical-align:top;border-right:1px solid #D5D8DC;"><span style="font-weight:600;font-size:11.5px;color:#1C1C1C;">CARD NAME</span></td>
+          <td style="padding:7px 8px;vertical-align:top;border-right:1px solid #D5D8DC;font-size:10px;color:#566573;">LIST NAME</td>
+          <td style="padding:7px 8px;vertical-align:top;border-right:1px solid #D5D8DC;">
+            <!-- if overdue: -->
+            <span style="font-size:10.5px;color:#C0392B;font-weight:700;">DD Mon YYYY <span style="display:inline-block;font-size:8.5px;background:#C0392B;color:white;padding:1px 5px;border-radius:2px;margin-left:4px;font-weight:600;">OVERDUE</span></span>
+            <!-- if normal: -->
+            <span style="font-size:10.5px;color:#1C1C1C;">DD Mon YYYY</span>
+            <!-- if no due: -->
+            <span style="font-size:10px;color:#AAB2BD;font-style:italic;">No due date</span>
+          </td>
+          <td style="padding:7px 8px;vertical-align:top;">
+            <!-- if has checklist: -->
+            <div style="display:flex;flex-direction:column;gap:3px;">
+              <div style="height:5px;border-radius:3px;background:#E5E8E8;overflow:hidden;width:100%;margin-bottom:2px;">
+                <div style="height:100%;border-radius:3px;background:BAR_COLOR;width:PCT%;"></div>
+              </div>
+              <span style="font-size:9.5px;color:#566573;">DONE/TOTAL done (PCT%)</span>
+              <!-- if pending>0: <span style="font-size:9px;color:#C0392B;font-weight:600;">N items pending</span> -->
+              <!-- if 100%: <span style="font-size:9px;color:#1E8449;font-weight:600;">✓ Complete</span> -->
+              <!-- if 0%: <span style="font-size:9px;color:#C0392B;font-weight:700;">⚠ Not started</span> -->
+            </div>
+            <!-- if no checklist: <span style="font-size:10px;color:#AAB2BD;font-style:italic;">No checklist</span> -->
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  Section colors:
+  - Section 1 (priority=1): header bg #B03A2E, even row bg #FBEAE9, bar colors: 0%=#C0392B, >0%=#D4AC0D, >=40%=#CA6F1E, >=75%=#1E8449, 100%=#1E8449
+  - Section 2 (priority=2): header bg #9A7D0A, even row bg #FEFDE7
+  - Section 3 (priority=3): header bg #A04000, even row bg #FEF5E7
+  - Section 4 (priority=4): header bg #1A5C35, even row bg #EAFAF1
+
+  Section titles:
+  - 1: "🔴 IMPORTANT · URGENT — Act on these before the meeting" / desc "High priority, high intervention — Sonal will ask about these first"
+  - 2: "🟡 IMPORTANT · NOT URGENT — Needs your hands-on involvement" / desc "Low priority, high intervention — make sure these are moving"
+  - 3: "🟠 URGENT · NOT IMPORTANT — Monitor and keep moving" / desc "High priority, low intervention — update status before the meeting"
+  - 4: "🟢 NOT URGENT · NOT IMPORTANT — Running in background" / desc "Low priority, low intervention — note any blockers"
+
+  After all 4 sections, add the attention box:
+  <div style="border:1.5px solid #D4AC0D;background:#FEFDE7;padding:12px 16px;margin-top:4px;display:flex;gap:16px;">
+    <div style="font-size:11px;font-weight:600;color:#9A7D0A;white-space:nowrap;min-width:130px;">📋 Please update<br>before meeting</div>
+    <div style="font-size:11px;line-height:1.65;color:#1C1C1C;">
+      <ul style="list-style:none;padding:0;">
+        <!-- bullet per overdue/0%-progress/due-soon card: -->
+        <li style="padding-left:14px;position:relative;margin-bottom:3px;"><span style="position:absolute;left:0;color:#D4AC0D;font-weight:700;">•</span><strong style="color:#1C2A3A;">CARD NAME:</strong> short action item</li>
+      </ul>
+    </div>
+  </div>
+
+  <div style="margin-top:18px;text-align:center;font-size:9.5px;color:#AAB2BD;border-top:1px solid #D5D8DC;padding-top:10px;">Valuecart Automation &nbsp;·&nbsp; ravi.digest@valuecart.in &nbsp;·&nbsp; Generated: {today} &nbsp;·&nbsp; Sent 2 days before meeting</div>
+</div>
+</body></html>
 """
 
 SONAL_PROMPT_TEMPLATE = """
-You are an email formatter. Generate a compact HTML email body for Sonal's key-discussion digest.
+You are an HTML email generator. Output a COMPLETE, self-contained HTML email for Sonal's key-discussion digest.
+Output ONLY raw HTML — no markdown, no code fences, no explanation.
+CRITICAL: Use ONLY inline styles with hardcoded hex colors — NO CSS classes, NO <style> blocks, NO CSS variables. Every element must have style= attributes directly. This will be rendered in Gmail which strips all <style> blocks.
 
 MEETING TIME (IST): {meeting_time}
 TODAY: {today}
 
-CARD DATA:
+CARD DATA (each card has Section 1-4, use exactly as given):
 {card_data}
 
-RULES:
-1. HTML only — no markdown, no code fences.
-2. Keep the total HTML under 6000 characters. Be concise — short labels, no verbose descriptions.
-3. Start with: "Hi Sonal,<br><br>Your Ravi (Trello) meeting is at {meeting_time} — approximately 2 hours away. Here are the key areas to discuss."
-4. Stats strip: 4 small inline boxes — Total Open, Immediate Action (Section 1 count), Overdue, On Track.
-5. Must-Discuss box (red border): bullet list only — card name + one short question (max 12 words each). No extra prose.
-6. Section 1 (RED "Must-Discuss"): compact table — Card Name | Due/Checklist | Ask Ravi (≤10 words).
-7. Section 2 (AMBER): same compact table.
-8. Section 3 (ORANGE): only overdue or 0%-progress cards, same compact table.
-9. Section 4 (GREEN): one line listing card names + checklist % separated by " · ". No table.
-10. Footer: one line — "Valuecart Automation · Sent 2 hours before meeting"
-11. Output ONLY the HTML body (no <html><head><body> wrapper).
+---
+SECTION RULES:
+- Section 1 (priority=1): "🔴 IMPORTANT · URGENT" — header bg #B03A2E, even-row bg #FBEAE9, badge "N cards — Act now"
+- Section 2 (priority=2): "🟡 IMPORTANT · NOT URGENT" — header bg #9A7D0A, even-row bg #FEFDE7, badge "N cards — Needs involvement"
+- Section 3 (priority=3): "🟠 URGENT · NOT IMPORTANT" — header bg #A04000, even-row bg #FEF5E7, badge "N overdue — Quick updates needed" — INCLUDE ONLY cards that are overdue OR have 0% checklist progress
+- Section 4 (priority=4): "🟢 NOT URGENT · NOT IMPORTANT" — header bg #1A5C35 — NO table, just a single text line listing card names with checklist % separated by ·
+
+CHECKLIST PROGRESS BAR COLORS:
+- 0%: bar bg #C0392B
+- 1–39%: bar bg #D4AC0D
+- 40–74%: bar bg #CA6F1E
+- 75–99%: bar bg #1E8449
+- 100%: bar bg #1E8449
+
+MUST-DISCUSS BOX: include all Section 1 cards + any Section 2/3 cards that are overdue with 0% progress. One bullet per card: card name in bold + one sharp sentence on status and what decision/update is needed from Ravi.
+
+---
+OUTPUT the following HTML exactly, filling in real data. Do NOT change any inline styles. Do NOT add <style> blocks.
+
+<!DOCTYPE html>
+<html><body style="background:#F0F2F5;font-family:Arial,sans-serif;color:#1C1C1C;padding:32px 16px;margin:0;">
+<div style="background:#FFFFFF;max-width:860px;margin:0 auto;padding:28px 30px;box-shadow:0 4px 40px rgba(0,0,0,0.13);">
+
+  <div style="border-left:5px solid #C0392B;padding:2px 0 2px 14px;margin:10px 0 6px;">
+    <div style="font-size:15px;font-weight:700;color:#1C2A3A;font-family:Arial,sans-serif;">Ravi Meeting — Key Discussion Areas</div>
+    <div style="font-size:10.5px;color:#566573;margin-top:3px;font-weight:300;">Ravi (Trello) meeting today &nbsp;·&nbsp; {today} &nbsp;·&nbsp; For Sonal's reference only</div>
+  </div>
+  <hr style="border:none;border-top:1px solid #D5D8DC;margin:10px 0 14px;">
+
+  <div style="font-size:11.5px;color:#566573;line-height:1.6;margin-bottom:16px;padding:10px 14px;background:#F8F9FA;border-left:3px solid #C0392B;">
+    Hi <strong style="color:#1C2A3A;">Sonal</strong>,<br><br>
+    Your Ravi (Trello) meeting is in <strong style="color:#1C2A3A;">~2 hours</strong> at <strong style="color:#1C2A3A;">{meeting_time} IST</strong>. Here are the key areas to discuss, organised by urgency.
+  </div>
+
+  <!-- Stats strip — 5 colour boxes -->
+  <table style="width:100%;border-collapse:separate;border-spacing:6px 0;margin-bottom:16px;"><tr>
+    <td style="background:#1C2A3A;color:white;padding:10px 12px;text-align:center;">
+      <div style="font-size:22px;font-weight:700;line-height:1;font-family:Arial,sans-serif;">TOTAL_COUNT</div>
+      <div style="font-size:9.5px;font-weight:600;text-transform:uppercase;margin-top:4px;opacity:0.85;">Total Open</div>
+    </td>
+    <td style="background:#FBEAE9;color:#B03A2E;padding:10px 12px;text-align:center;">
+      <div style="font-size:22px;font-weight:700;line-height:1;font-family:Arial,sans-serif;">S1_COUNT</div>
+      <div style="font-size:9.5px;font-weight:600;text-transform:uppercase;margin-top:4px;">Immediate Action</div>
+    </td>
+    <td style="background:#FEFDE7;color:#9A7D0A;padding:10px 12px;text-align:center;">
+      <div style="font-size:22px;font-weight:700;line-height:1;font-family:Arial,sans-serif;">S2_COUNT</div>
+      <div style="font-size:9.5px;font-weight:600;text-transform:uppercase;margin-top:4px;">Needs Involvement</div>
+    </td>
+    <td style="background:#FEF5E7;color:#A04000;padding:10px 12px;text-align:center;">
+      <div style="font-size:22px;font-weight:700;line-height:1;font-family:Arial,sans-serif;">OVERDUE_COUNT</div>
+      <div style="font-size:9.5px;font-weight:600;text-transform:uppercase;margin-top:4px;">Overdue Items</div>
+    </td>
+    <td style="background:#EAFAF1;color:#1A5C35;padding:10px 12px;text-align:center;">
+      <div style="font-size:22px;font-weight:700;line-height:1;font-family:Arial,sans-serif;">ON_TRACK_COUNT</div>
+      <div style="font-size:9.5px;font-weight:600;text-transform:uppercase;margin-top:4px;">On Track</div>
+    </td>
+  </tr></table>
+
+  <!-- Must-Discuss box -->
+  <div style="border:1.5px solid #C0392B;background:#FBEAE9;padding:14px 18px;margin-bottom:14px;">
+    <div style="font-size:11.5px;font-weight:700;color:#B03A2E;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;font-family:Arial,sans-serif;">⚡ Must-Discuss Today</div>
+    <ul style="list-style:none;padding:0;margin:0;">
+      [INSERT one <li> per must-discuss card using this exact markup:]
+      <li style="font-size:11px;line-height:1.6;padding-left:14px;position:relative;margin-bottom:4px;color:#1C1C1C;"><span style="position:absolute;left:0;color:#C0392B;font-weight:700;">▸</span><strong style="color:#1C2A3A;">CARD NAME:</strong> one sharp sentence on current status + what decision or update is needed from Ravi.</li>
+    </ul>
+  </div>
+
+  [INSERT Section 1 block if cards exist — use this exact structure:]
+  <div style="margin-bottom:14px;">
+    <div style="padding:7px 12px;background:#B03A2E;color:white;font-size:11px;font-weight:700;font-family:Arial,sans-serif;">🔴 &nbsp;IMPORTANT · URGENT <span style="font-size:9px;background:rgba(255,255,255,0.25);padding:2px 7px;border-radius:10px;margin-left:8px;">N cards — Act now</span></div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <thead><tr style="background:#2C3E50;">
+        <th style="color:white;font-size:9.5px;font-weight:700;text-transform:uppercase;padding:5px 10px;text-align:left;border-right:1px solid #1C2A3A;width:36%;">Card</th>
+        <th style="color:white;font-size:9.5px;font-weight:700;text-transform:uppercase;padding:5px 10px;text-align:left;border-right:1px solid #1C2A3A;width:18%;">Due</th>
+        <th style="color:white;font-size:9.5px;font-weight:700;text-transform:uppercase;padding:5px 10px;text-align:left;width:46%;">Discussion Prompt</th>
+      </tr></thead>
+      <tbody>
+        [INSERT one <tr> per card — odd rows bg #FFFFFF, even rows bg #FBEAE9:]
+        <tr style="background:#FBEAE9;border-bottom:1px solid #D5D8DC;">
+          <td style="padding:8px 10px;border-right:1px solid #D5D8DC;vertical-align:top;"><span style="font-weight:600;font-size:11.5px;color:#1C1C1C;display:block;">CARD NAME</span><span style="font-size:9px;color:#566573;font-family:Arial,sans-serif;">LIST NAME</span></td>
+          <td style="padding:8px 10px;border-right:1px solid #D5D8DC;vertical-align:top;">
+            [if overdue:] <span style="font-size:10.5px;color:#C0392B;font-weight:700;">DD Mon YYYY <span style="display:inline-block;font-size:8px;background:#C0392B;color:white;padding:1px 4px;border-radius:2px;margin-left:3px;font-weight:600;">OVERDUE</span></span>
+            [if not overdue:] <span style="font-size:10.5px;color:#1C1C1C;">DD Mon YYYY</span>
+            [if has checklist:] <div style="height:4px;border-radius:2px;background:#E5E8E8;overflow:hidden;width:80%;margin-top:3px;"><div style="height:100%;border-radius:2px;background:BAR_COLOR;width:PCT%;"></div></div><span style="font-size:9px;color:#566573;display:block;margin-top:2px;">DONE/TOTAL · N pending</span>
+          </td>
+          <td style="padding:8px 10px;vertical-align:top;line-height:1.5;">
+            <span style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#566573;display:block;margin-bottom:3px;">Ask Ravi</span>
+            <em style="color:#1C2A3A;font-size:10.5px;">"Verbatim question Sonal can read out directly."</em>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  [INSERT Section 2 block if cards exist — same table structure, header bg #9A7D0A, even-row bg #FEFDE7, badge "N cards — Needs involvement"]
+
+  [INSERT Section 3 block if qualifying cards exist — same table structure, header bg #A04000, even-row bg #FEF5E7, badge "N overdue — Quick updates needed". ONLY include cards that are overdue OR have 0 checklist items done.]
+
+  [INSERT Section 4 block if cards exist — header only + single text line, NO table:]
+  <div style="margin-bottom:14px;">
+    <div style="padding:7px 12px;background:#1A5C35;color:white;font-size:11px;font-weight:700;font-family:Arial,sans-serif;">🟢 &nbsp;NOT URGENT · NOT IMPORTANT <span style="font-size:9px;background:rgba(255,255,255,0.25);padding:2px 7px;border-radius:10px;margin-left:8px;">N cards — On track, no action needed</span></div>
+    <div style="border:1px solid #D5D8DC;border-top:none;padding:10px 12px;font-size:11px;color:#566573;line-height:1.7;">
+      The following are progressing normally — raise only if Ravi flags a blocker:<br>
+      <span style="color:#1C1C1C;">CARD NAME (PCT%) &nbsp;·&nbsp; CARD NAME (PCT%) &nbsp;·&nbsp; ...</span>
+    </div>
+  </div>
+
+  <div style="margin-top:18px;text-align:center;font-size:9.5px;color:#AAB2BD;border-top:1px solid #D5D8DC;padding-top:10px;font-family:Arial,sans-serif;">Valuecart Automation &nbsp;·&nbsp; ravi.digest@valuecart.in &nbsp;·&nbsp; Sent 2 hours before meeting &nbsp;·&nbsp; For Sonal's eyes only</div>
+</div>
+</body></html>
 """
 
 
@@ -258,9 +450,10 @@ def generate_html_with_claude(prompt: str) -> str:
     client = _claude_client()
     msg = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=4096,
+        max_tokens=24000,
         messages=[{"role": "user", "content": prompt}],
     )
+    log.info("Claude stop_reason=%s tokens_used=%s", msg.stop_reason, msg.usage.output_tokens)
     html = msg.content[0].text.strip()
     # Strip markdown code fences if Claude wrapped the output
     if html.startswith("```"):
