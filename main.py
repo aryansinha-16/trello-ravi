@@ -351,6 +351,11 @@ def job_sonal_digest():
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    if os.environ.get("RUN_NOW") == "true":
+        log.info("RUN_NOW=true — firing both jobs immediately.")
+        job_ravi_digest()
+        job_sonal_digest()
+
     scheduler = BlockingScheduler(timezone=IST)
 
     # 9:00 AM IST daily — check both conditions
