@@ -353,12 +353,11 @@ def job_sonal_digest():
 if __name__ == "__main__":
     scheduler = BlockingScheduler(timezone=IST)
 
-    # 8:00 AM IST daily — Ravi's digest (2 days before meeting)
-    scheduler.add_job(job_ravi_digest,  "cron", hour=8,  minute=0, id="ravi_digest")
-    # 6:00 AM IST daily — Sonal's digest (on meeting day)
-    scheduler.add_job(job_sonal_digest, "cron", hour=6,  minute=0, id="sonal_digest")
+    # 9:00 AM IST daily — check both conditions
+    scheduler.add_job(job_ravi_digest,  "cron", hour=9, minute=0, id="ravi_digest")
+    scheduler.add_job(job_sonal_digest, "cron", hour=9, minute=0, id="sonal_digest")
 
-    log.info("Scheduler started. Jobs: ravi_digest @ 08:00 IST, sonal_digest @ 06:00 IST")
+    log.info("Scheduler started. Both jobs @ 09:00 IST daily.")
     try:
         scheduler.start()
     except KeyboardInterrupt:
